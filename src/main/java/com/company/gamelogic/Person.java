@@ -1,6 +1,5 @@
 package com.company.gamelogic;
 
-//TODO Think of a better name for this class
 public class Person {
 
     private String name;

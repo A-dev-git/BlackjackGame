@@ -6,61 +6,70 @@ import java.util.List;
 
 public class BlackjackGame {
 
-    //TODO Should these be static or just final
     private static final int BUST_AMOUNT = 22;
     private static final int BLACKJACK_SCORE = 21;
 
     private static final int ACE_VALUE_ONE = 1;
     private static final int ACE_VALUE_TEN = 10;
 
-    public static List<RoundResult> evaluateRound(List<Player> players, Dealer dealer){
-        if(players == null || players.size() == 0) throw new RuntimeException("Player list must be a minimum length of 1");
+    private static final int AUTO_WIN_CARD_AMOUNT = 5;
+
+    public static List<RoundResult> evaluateRound(List<Player> players, Dealer dealer) {
+        if(players == null || players.size() == 0) throw new InvalidPlayerListException("Player list must be a minimum length of 1");
+        if(dealer == null) throw new InvalidDealerException("Dealer object cannot be null");
 
         List<RoundResult> roundResults = new ArrayList<>();
 
+        //Check if any players bust, if so remove them from the list
         //Using iterator so that we can remove players from the round if they have busted while we are iterating. Using Iterator avoids ConcurrentModification exception
-        Iterator<Player> itr = players.iterator();
-        while (itr.hasNext()) {
-            Player player = itr.next();
+        for (Iterator<Player> iterator = players.iterator(); iterator.hasNext(); ) {
+            Player player = iterator.next();
+
             if(isBust(player.getHand())){
                 roundResults.add(new RoundResult(player,false,calculateHandScore(player.getHand())));
-                itr.remove();
+                iterator.remove();
+            }
+
+            if(players.size() == 0){
+                return roundResults;
             }
         }
 
-        if(players.size() == 0){
-            roundResults.add(new RoundResult(dealer,true,calculateHandScore(dealer.getHand())));
-        }
-
-        if(isBust(dealer.getHand())){
-            roundResults.add(new RoundResult(dealer,false,calculateHandScore(dealer.getHand())));
-
-            players.forEach(player -> {
+        //Check if players have 5 cards, if so they win
+        for (Iterator<Player> iterator = players.iterator(); iterator.hasNext(); ) {
+            Player player = iterator.next();
+            if(handHasFiveCards(player.getHand())){
                 roundResults.add(new RoundResult(player,true,calculateHandScore(player.getHand())));
-            });
+                iterator.remove();
+            }
         }
-        //evaluate if any players have bust
-//        players.forEach(player -> {
-//            if(isBust(player.getHand())){
-//                roundResults.add(new RoundResult(player,false,calculateHandScore(player.getHand())));
-//            }
-//        });
+
+        //Check if dealer busts
+        if(isBust(dealer.getHand())){
+            players.forEach(player -> roundResults.add(new RoundResult(player,true,calculateHandScore(player.getHand()))));
+            return roundResults;
+        }
 
         //Check for black jacks
         if(isBlackJack(dealer.getHand())){
             players.forEach(player -> {
                 if (isBlackJack(player.getHand())) {
-                    roundResults.add(new RoundResult(dealer,false,calculateHandScore(dealer.getHand())));
                     roundResults.add(new RoundResult(player,true,calculateHandScore(player.getHand())));
                 }else{
                     roundResults.add(new RoundResult(player,false,calculateHandScore(player.getHand())));
-                    roundResults.add(new RoundResult(dealer,true,calculateHandScore(dealer.getHand())));
                 }
             });
-
             return roundResults;
         }
 
+        //Check if players hand score is higher than or equal to dealers
+        players.forEach(player -> {
+            if(calculateHandScore(player.getHand()) >= calculateHandScore(dealer.getHand())){
+                roundResults.add(new RoundResult(player,true,calculateHandScore(player.getHand())));
+            }else {
+                roundResults.add(new RoundResult(player,false,calculateHandScore(player.getHand())));
+            }
+        });
         return roundResults;
     }
 
@@ -68,12 +77,14 @@ public class BlackjackGame {
         return calculateHandScore(hand) == BLACKJACK_SCORE;
     }
 
-    public static boolean isBust(Hand hand){
+    public static boolean handHasFiveCards(Hand hand){
+        return hand.getCards().size() == AUTO_WIN_CARD_AMOUNT;
+    }
 
+    public static boolean isBust(Hand hand){
         return calculateHandScore(hand) >= BUST_AMOUNT;
     }
 
-    //TODO Maybe minimize this with lambda or something
     public static int calculateHandScore(Hand hand){
         int handScore = 0;
 
@@ -95,6 +106,8 @@ public class BlackjackGame {
         if(aceInHand){
             if(handScoreAceTen >= BUST_AMOUNT && handScoreAceOne <= BLACKJACK_SCORE){
                 return handScoreAceOne;
+            }else {
+                return handScoreAceTen;
             }
         }
 
